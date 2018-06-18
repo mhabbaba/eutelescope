@@ -140,6 +140,9 @@ namespace eutelescope {
     double _correcttriplett;
     double _correctdriplett;
     int _numberOfTracks;
+    int _found_tracks;
+    double _correcttrack;
+    double _wrongtrack;
 
     //Analysis parameters
     bool _isFirstEvent;

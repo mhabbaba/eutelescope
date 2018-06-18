@@ -74,6 +74,8 @@
 #include <map>
 #include <cstdlib>
 #include <limits>
+#include <iostream>
+#include <fstream>
 
 // ROOT includes ".h"
 #include <TMath.h>
@@ -264,7 +266,7 @@ void EUTelGBLFitter::init() {
     }  
   }
 
-  _triplet_res_cut = _triplet_res_cut *6. / _eBeam * (_planePosition[1] - _planePosition[0]) / 20.;
+ // _triplet_res_cut = _triplet_res_cut *6. / _eBeam * (_planePosition[1] - _planePosition[0]) / 20.;
 
   // Book histograms:
 #if defined(USE_AIDA) || defined(MARLIN_USE_AIDA)
@@ -711,7 +713,110 @@ void EUTelGBLFitter::processEvent( LCEvent * event ) {
 
   streamlog_out(DEBUG4) << "Found " << telescope_tracks.size() << " tracks from matching t/driplets." << endl;
   
+  _found_tracks = _found_tracks + telescope_tracks.size();
+
   for( auto& tr: telescope_tracks ){
+
+	for(int iTrack = 0 ; iTrack < trackcollection->getNumberOfElements() ; iTrack++){
+                auto track = static_cast<Track*>(trackcollection->getElementAt(iTrack));
+                auto trackhitvec = track->getTrackerHits();
+                if(trackhitvec.size() == 6){
+                        auto hit_0 = trackhitvec[0];
+                        auto hit_1 = trackhitvec[1];
+                        auto hit_2 = trackhitvec[2];
+                        auto hit_3 = trackhitvec[3];
+                        auto hit_4 = trackhitvec[4];
+                        auto hit_5 = trackhitvec[5];
+                        for(int iHit = 0 ; iHit < 6 ; iHit++){
+                                auto MCsensorID = hitCellDecoder(trackhitvec[iHit])["sensorID"];
+                                if(MCsensorID == 0){
+                                        hit_0 = trackhitvec[iHit];
+                                }
+                                if(MCsensorID == 1){
+                                        hit_1 = trackhitvec[iHit];
+                                }
+                                if(MCsensorID == 2){
+                                        hit_2 = trackhitvec[iHit];
+                                }
+                                if(MCsensorID == 3){
+                                        hit_3 = trackhitvec[iHit];
+                                }
+                                if(MCsensorID == 4){
+                                        hit_4 = trackhitvec[iHit];
+                                }
+                                if(MCsensorID == 5){
+                                        hit_5 = trackhitvec[iHit];
+                                }
+                        }
+                        auto hit_0_vec = hit_0->getPosition();
+                        auto hit_1_vec = hit_1->getPosition();
+                        auto hit_2_vec = hit_2->getPosition();
+                        auto hit_3_vec = hit_3->getPosition();
+                        auto hit_4_vec = hit_4->getPosition();
+                        auto hit_5_vec = hit_5->getPosition();
+                        if(hit_0_vec[0] == tr.gethit(0).x){
+                                if(hit_0_vec[1] == tr.gethit(0).y){
+                                        if(hit_1_vec[0] == tr.gethit(1).x){
+                                                if(hit_1_vec[1] == tr.gethit(1).y){
+                                                        if(hit_2_vec[0] == tr.gethit(2).x){
+                                                                if(hit_2_vec[1] == tr.gethit(2).y){
+                                                                        if(hit_3_vec[0] == tr.gethit(3).x){
+                                						if(hit_3_vec[1] == tr.gethit(3).y){
+                                        						if(hit_4_vec[0] == tr.gethit(4).x){
+                                                						if(hit_4_vec[1] == tr.gethit(4).y){
+                                                        						if(hit_5_vec[0] == tr.gethit(5).x){
+                                                                						if(hit_5_vec[1] == tr.gethit(5).y){
+															_correcttrack = _correcttrack+1;
+														}
+														else{
+															_wrongtrack =_wrongtrack+1;
+														}
+													}
+													else{
+                                                                                                                _wrongtrack =_wrongtrack+1;
+                                                                                                        }
+												}
+												else{
+                                                                                                        _wrongtrack =_wrongtrack+1;
+                                                                                                }
+											}
+											else{
+                                                                                              _wrongtrack =_wrongtrack+1;
+                                                                                        }
+										}
+										else{
+                                                                                        _wrongtrack =_wrongtrack+1;
+                                                                                }
+									}
+									else{
+                                                                               _wrongtrack =_wrongtrack+1;
+                                                                        }
+                                                                }
+								else{
+                                                                        _wrongtrack =_wrongtrack+1;
+                                                                }
+                                                        }
+							else{
+                                                                _wrongtrack =_wrongtrack+1;
+                                                        }
+                                                }
+						else{
+                                                          _wrongtrack =_wrongtrack+1;
+                                                }
+                                        }
+					else{
+                                                _wrongtrack =_wrongtrack+1;
+                                        }
+                                }
+				else{
+                                       _wrongtrack =_wrongtrack+1;
+                                }
+                        }
+			else{
+                               _wrongtrack =_wrongtrack+1;
+                        }
+		}
+	}
     //unused: auto const & trip = tr.get_upstream();
     auto const & drip = tr.get_downstream();
     EUTelTripletGBLUtility::triplet srip(tr.gethit(0), tr.gethit(2), tr.gethit(5)); // seed triplet is called srip
@@ -1151,10 +1256,13 @@ void EUTelGBLFitter::check( LCEvent * /* evt */  ) {
 
 //------------------------------------------------------------------------------
 void EUTelGBLFitter::end(){
-  
+	std::cout << _wrongtrack << std::endl;
+       std::cout << _correcttrack << std::endl;	
   //compute the percentage of correcly identified up- and downstream tripletts
   _correcttriplett = (_correcttriplett/_numberOfTracks)*100;
   _correctdriplett = (_correctdriplett/_numberOfTracks)*100;
+  _correcttrack = (_correcttrack/_numberOfTracks)*100;
+  _wrongtrack = (_wrongtrack/_found_tracks)*100;
 
   // Print the summary:
   streamlog_out(MESSAGE5)
@@ -1166,7 +1274,17 @@ void EUTelGBLFitter::end(){
     << "Percentage of correctly identified Upstreamtripletts:    "
     << _correcttriplett << "%" << std::endl
     << "Percentage of correctly identified Downstreamtripletts:    "
-    << _correctdriplett << "%" << std::endl;
+    << _correctdriplett << "%" << std::endl
+    << "Percentage of correctly identified Tracks:    "
+    << _correcttrack << "%" << std::endl
+    << "Percentage of wrongly identified Tracks:    "
+    << _wrongtrack << "%" << std::endl;
+
+//	ofstream outputFile;
+//	outputFile.open("slopeCutSol.txt", std::ios_base::app);
+//	outputFile << _slope_cut << "      " << _triplet_res_cut  << "      "  << _correcttriplett << "      " << _correctdriplett  << std::endl;
+//	outputFile.close();
+
 }
 
 void EUTelGBLFitter::fillTrackhitHisto(EUTelTripletGBLUtility::hit const & hit, int ipl){
@@ -1303,7 +1421,7 @@ void EUTelGBLFitter::bookHistos(){
   du23Histo = AIDAProcessor::histogramFactory(this)->
     createHistogram1D( "Telescope/du23", 100, -1, 1 );
   du23Histo->setTitle( "x3-x2, |dy| < 1;x_{3}-x_{2} [mm];hit pairs" );
-
+https://gitlab.com/users/sign_in
   dx34Histo = AIDAProcessor::histogramFactory(this)->
     createHistogram1D( "Telescope/dx34", 100, -1, 1 );
   dx34Histo->setTitle( "x4-x3;x_{4}-x_{3} [mm];hit pairs" );
@@ -2072,3 +2190,7 @@ void EUTelGBLFitter::bookHistos(){
   return;
 }
 #endif
+
+
+
+
